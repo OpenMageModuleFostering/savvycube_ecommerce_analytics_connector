@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Magento
  *
@@ -15,30 +14,26 @@
  *
  * @category   SavvyCube
  * @package    SavvyCube_Connector
- * @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+ * @copyright  Copyright (c) 2017 SavvyCube
+ * SavvyCube is a trademark of Webtex Solutions, LLC
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
-class SavvyCube_Connector_Model_Api_Notification extends SavvyCube_Connector_Model_Api_Abstract
+class SavvyCube_Connector_Model_Baseurl extends Mage_Core_Model_Config_Data
 {
-
-
     /**
-     * Render response on wCube/api/version get query
+     * Decrypt value after loading
      *
-     * @return array
      */
-    public function getMethod()
+    protected function _afterLoad()
     {
-        /** @var SavvyCube_Connector_Helper_Data $helper */
-        $helper = Mage::helper('wCube');
-        $helper->addAdminNotification(
-            $this->request['title'],
-            $this->request['description']
-        );
-
-        return array(
-            'success' => 1
-        );
+        if (empty($this->getValue())) {
+            $baseUrl = Mage::app()->getDefaultStoreView()->getBaseUrl();
+            $this->setValue($baseUrl);
+            Mage::getConfig()->saveConfig(
+                'w_cube/settings/base_url', $baseUrl, 'default', 0
+            );
+            Mage::getConfig()->cleanCache();
+            Mage::app()->reinitStores();
+        }
     }
-
 }

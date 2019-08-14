@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Magento
  *
@@ -15,13 +14,15 @@
  *
  * @category   SavvyCube
  * @package    SavvyCube_Connector
- * @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+ * @copyright  Copyright (c) 2017 SavvyCube
+ * SavvyCube is a trademark of Webtex Solutions, LLC
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 class SavvyCube_Connector_Model_Api_Transaction extends SavvyCube_Connector_Model_Api_Abstract
 {
-    protected $mainTable = 'sales_payment_transaction';
+    protected $_mainTable = 'sales_payment_transaction';
 
+    protected $_order = 'payment_table.entity_id';
 
     /**
      * Render response
@@ -31,7 +32,7 @@ class SavvyCube_Connector_Model_Api_Transaction extends SavvyCube_Connector_Mode
     public function getMethod()
     {
         $sql = $this->getHelper()->getDbRead()->select()
-            ->from(array('main_table' => $this->getHelper()->getTableName($this->mainTable)))
+            ->from(array('main_table' => $this->getHelper()->getTableName($this->_mainTable)))
             ->joinLeft(
                 array('payment_table' => $this->getHelper()->getTableName('sales_flat_order_payment')),
                 "main_table.payment_id = payment_table.entity_id"
@@ -39,7 +40,8 @@ class SavvyCube_Connector_Model_Api_Transaction extends SavvyCube_Connector_Mode
             ->reset(Varien_Db_Select::COLUMNS)
             ->columns($this->columnsListForGet());
 
-        return $this->getResult($sql, '`main_table`.created_at');
+        $this->_data = $this->getResult($sql, '`main_table`.created_at');
+        return true;
     }
 
     /**
@@ -47,35 +49,32 @@ class SavvyCube_Connector_Model_Api_Transaction extends SavvyCube_Connector_Mode
      *
      * @return string | array
      */
-    protected function columnsListForGet()
+    public function columnsListForGet()
     {
         return array_merge(
             $this->prepareColumns(
                 array(
-                    'base_shipping_captured',
-                    'base_amount_paid',
-                    'base_amount_authorized',
-                    'base_amount_paid_online',
-                    'base_amount_refunded_online',
-                    'base_shipping_amount',
-                    'base_amount_ordered',
-                    'base_shipping_refunded',
-                    'base_amount_refunded',
-                    'base_amount_canceled',
+                    'parent_id',
+                    'entity_id',
                     'method',
                     'last_trans_id'
                 ),
-                'payment_table'
+                'sales_flat_order_payment',
+                'payment_table',
+                array(
+                    'parent_id' => 'order_id'
+                )
             ),
             $this->prepareColumns(
                 array(
-                    'entity_id' => 'transaction_id',
-                    'order_id',
+                    'transaction_id',
                     'txn_id',
+                    'parrent_txn_id',
                     'txn_type',
                     'is_closed',
                     'created_at'
                 ),
+                $this->_mainTable,
                 'main_table'
             )
         );

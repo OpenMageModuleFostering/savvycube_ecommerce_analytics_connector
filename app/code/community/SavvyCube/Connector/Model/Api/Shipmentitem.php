@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Magento
  *
@@ -15,16 +14,16 @@
  *
  * @category   SavvyCube
  * @package    SavvyCube_Connector
- * @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+ * @copyright  Copyright (c) 2017 SavvyCube
+ * SavvyCube is a trademark of Webtex Solutions, LLC
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 class SavvyCube_Connector_Model_Api_Shipmentitem extends SavvyCube_Connector_Model_Api_Abstract
 {
-    protected $mainTable = 'sales_flat_shipment_item';
+    protected $_mainTable = 'sales_flat_shipment_item';
 
-    protected $parentEntity = array(
-        'model' => 'wCube/api_shipment',
-        'parent_date' => 'updated_at',
+    protected $_parentEntity = array(
+        'table' => 'sales_flat_shipment',
         'parent_fk' => 'parent_id'
     );
 
@@ -33,19 +32,18 @@ class SavvyCube_Connector_Model_Api_Shipmentitem extends SavvyCube_Connector_Mod
      *
      * @return string | array
      */
-    protected function columnsListForGet()
+    public function columnsListForGet()
     {
         return $this->prepareColumns(
             array(
                 'entity_id',
-                'parent_id',
-                'row_total',
-                'price',
-                'weight',
-                'qty',
-                'product_id',
                 'order_item_id',
+                'parent_id',
+                'product_id',
+                'qty',
+                'weight',
             ),
+            $this->_mainTable,
             'main_table'
         );
     }

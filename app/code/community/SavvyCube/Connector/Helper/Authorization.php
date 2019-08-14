@@ -14,175 +14,247 @@
  *
  * @category   SavvyCube
  * @package    SavvyCube_Connector
- * @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+ * @copyright  Copyright (c) 2017 SavvyCube
+ * SavvyCube is a trademark of Webtex Solutions, LLC
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 class SavvyCube_Connector_Helper_Authorization extends Mage_Core_Helper_Abstract
 {
-    const CONSUMER_KEY_LENGTH = 10;
+    const TIMESTAMP_GAP = 600; # 10 min
 
-    /**
-     * function generates consumer key, encrypts it and tries to send
-     * to $consumerEndpoint. Returns operation status.
-     *
-     * @return bool
-     */
-    public function initConsumerKey()
+    protected $_scRsa = null;
+
+    protected $_rsa = null;
+
+    protected $_cRsa = null;
+
+    public function getActivationUrl()
     {
-        $plainConsumerKey = $this->generateNewKey();
-        $eKey = $this->generateNewEKey();
-        $this->setCurrentKey($plainConsumerKey);
-        $this->setCurrentKey($eKey, 'e');
+        $baseUrl = Mage::getStoreConfig('w_cube/settings/base_url', 0);
+        $adminUrl = Mage::helper("adminhtml")
+            ->getUrl("adminhtml/savvycube/activate");
+        return Mage::getStoreConfig('w_cube/settings/savvy_url')
+        . "account/connect-login?"
+        . "&type=m1"
+        . "&url=" . urlencode($baseUrl)
+        . "&admin_url=" . urlencode($adminUrl)
+        . "&session=" . Mage::getStoreConfig('w_cube/settings/candidate_ts', 0)
+        . "&pub=" . base64_encode($this->getCandidatePublicKey());
+    }
+
+    public function cleanCache()
+    {
         Mage::getConfig()->cleanCache();
         Mage::app()->reinitStores();
-        return true;
     }
 
-    /**
-     * function generates new consumer key
-     *
-     * @return string
-     */
-    private function generateNewKey()
+    public function generateKeys()
     {
-        return mcrypt_create_iv(self::CONSUMER_KEY_LENGTH);
+        $keys = $this->getRsa()->createKey(2048);
+        $this->setCandidatePublicKey($keys['publickey']);
+        $this->setCandidatePrivateKey($keys['privatekey']);
+        $this->_cRsa = null;
     }
 
-    /**
-     * function generates new traffic encryption key
-     *
-     * @return string
-     */
-    private function generateNewEKey()
+    public function candidateSignature($session)
     {
-        return mcrypt_create_iv(16);
-    }
-
-    /**
-     * function returns certificate path from current module configuration
-     *
-     * @return string
-     */
-    private function getCert()
-    {
-        return
-            Mage::getModuleDir("", 'SavvyCube_Connector') . DS .
-            str_replace(
-                '/',
-                DS,
-                (string) Mage::getStoreConfig('wCube/cube_crypt/open_key_file_path')
-            );
-    }
-
-    /**
-     * function generates module activation url
-     *
-     * @return string url to activate model
-     */
-    public function getActivateUrl()
-    {
-        $url = $this->getConsumerEndpoint()
-        . "datasources/?act=connect&type=0"
-        . "&url=" . urlencode(Mage::getBaseUrl())
-        . "&secure_url=" . urlencode(Mage::getBaseUrl(Mage_Core_Model_Store::URL_TYPE_LINK, true))
-        . "&key=" . rawurlencode($this->getCurrentEncryptedKey())
-        . "&e_key=" . rawurlencode($this->getCurrentEncryptedKey('e'));
-        return $url;
-    }
-
-    /**
-     * return consumer endpoint
-     *
-     * @return string
-     */
-    private function getConsumerEndpoint()
-    {
-        return (string) Mage::getStoreConfig('wCube/cube_crypt/consumer_endpoint');
-    }
-
-    /**
-     * store consumer secret in configuration with encryption
-     */
-    private function setCurrentKey($key, $type = 'consumer')
-    {
-        Mage::getConfig()->saveConfig("cube_crypt/{$type}_secret", Mage::helper('core')->encrypt($key));
-        $rsaProvider = new Zend_Crypt_Rsa(array('certificatePath' => $this->getCert()));
-        $encryptedKey = $rsaProvider->encrypt($key, $rsaProvider->getPublicKey(), Zend_Crypt_Rsa::BASE64);
-        Mage::getConfig()->saveConfig("cube_crypt/{$type}_encrypted", $encryptedKey);
-    }
-
-    /**
-     * return consumer encrypted secret from configuration in plain text
-     *
-     * @return string
-     */
-    private function getCurrentEncryptedKey($type = 'consumer')
-    {
-        return (string)Mage::getStoreConfig("cube_crypt/{$type}_encrypted");
-    }
-
-    /**
-     * return current consumer secret from configuration in plain text
-     *
-     * @return string
-     */
-    public function getCurrentKey($type = 'consumer')
-    {
-        return Mage::helper('core')->decrypt((string)Mage::getStoreConfig("cube_crypt/{$type}_secret"));
-    }
-
-    /**
-     * function checks if request is valid
-     *
-     * @param Mage_Core_Controller_Request_Http $request request for checking
-     *
-     * @return bool
-     */
-    public function checkRequest()
-    {
-        if (isset($_SERVER['HTTP_X_WSSE'])) {
-            $xWsse = $this->parseToken($_SERVER['HTTP_X_WSSE']);
-            if ($xWsse) {
-                /** @var SavvyCube_Connector_Model_Nonce $nonceModel */
-                $nonceModel = Mage::getModel('wCube/nonce');
-                $xWsse['Nonce'] = urldecode($xWsse['Nonce']);
-                $xWsse['Created'] = urldecode($xWsse['Created']);
-                if ($nonceModel->checkNonce($xWsse['Nonce'], $xWsse['Created'])) {
-                    $calculatedDigest = base64_encode((sha1($xWsse['Nonce'] . $xWsse['Created'] . $this->getCurrentKey())));
-                    return $calculatedDigest === $xWsse['SecretDigest'];
-                }
-            }
-        }
-        return false;
-    }
-
-
-    private function parseToken($token)
-    {
-        $wsse = '/UsernameToken Username="([^"]+)", SecretDigest="([^"]+)", Nonce="([^"]+)", Created="([^"]+)"/';
-        if (1 === preg_match($wsse, $token, $matches)) {
-            array_shift($matches);
-            $map = array('Username', 'SecretDigest', 'Nonce', 'Created');
-            return array_combine($map, $matches);
-        }
-        return false;
-    }
-
-    /**
-     * return nonce lifeTime value from current module configuration
-     *
-     * @param bool $secondsFormat return in seconds if true given
-     *
-     * @return int
-     */
-    public function getNonceLifetime($secondsFormat = false)
-    {
-        $lifeTimeInMinutes = (string) Mage::getStoreConfig('wCube/cube_crypt/nonce_lifetime');
-
-        if ($secondsFormat) {
-            return $lifeTimeInMinutes * 60;
+        $currentTs = (int)Mage::getSingleton('core/date')->gmtTimestamp();
+        if ($session == Mage::getStoreConfig('w_cube/settings/candidate_ts', 0)
+            && $currentTs - Mage::getStoreConfig('w_cube/settings/candidate_ts', 0) < 120
+        ) {
+            $rsa = $this->getCandidateRsa();
+            $iv = crypt_random_string(10);
+            return array(base64_encode($iv),
+                base64_encode($rsa->sign($iv)));
         }
 
-        return $lifeTimeInMinutes;
+        return False;
     }
+
+    public function promoteCandidateKeys($session)
+    {
+        $currentTs = (int)Mage::getSingleton('core/date')->gmtTimestamp();
+        if ($session == Mage::getStoreConfig('w_cube/settings/candidate_ts', 0)
+            && $currentTs - Mage::getStoreConfig('w_cube/settings/candidate_ts', 0) < 120
+        ) {
+            $this->setPublicKey($this->getCandidatePublicKey());
+            $this->setPrivateKey($this->getCandidatePrivateKey());
+            $this->setCandidatePublicKey('');
+            $this->setCandidatePrivateKey('');
+            Mage::getConfig()->saveConfig('w_cube/settings/candidate_ts', 0, 'default', 0);
+            $this->_rsa = null;
+            $this->_cRsa = null;
+            return True;
+        }
+
+        return False;
+    }
+
+    public function getCandidatePublicKey()
+    {
+        return Mage::getStoreConfig('w_cube/settings/candidate_pub', 0);
+    }
+
+    public function setCandidatePublicKey($val)
+    {
+        Mage::getConfig()->saveConfig('w_cube/settings/candidate_pub', $val, 'default', 0);
+    }
+
+    public function getCandidatePrivateKey()
+    {
+        return Mage::helper('core')->decrypt(
+            Mage::getStoreConfig('w_cube/settings/candidate_priv', 0)
+        );
+    }
+
+    public function setCandidatePrivateKey($val)
+    {
+        $currentTs = (int)Mage::getSingleton('core/date')->gmtTimestamp();
+        $val = Mage::helper('core')->encrypt($val);
+        Mage::getConfig()->saveConfig('w_cube/settings/candidate_priv', $val, 'default', 0);
+        Mage::getConfig()->saveConfig('w_cube/settings/candidate_ts', $currentTs, 'default', 0);
+    }
+
+
+    public function getPublicKey()
+    {
+        return Mage::getStoreConfig('w_cube/settings/pub', 0);
+    }
+
+    public function setPublicKey($val)
+    {
+        Mage::getConfig()->saveConfig('w_cube/settings/pub', $val, 'default', 0);
+    }
+
+    public function getPrivateKey()
+    {
+        return Mage::getStoreConfig('w_cube/settings/priv', 0);
+    }
+
+    public function setPrivateKey($val)
+    {
+        $val = Mage::helper('core')->encrypt($val);
+        Mage::getConfig()->saveConfig('w_cube/settings/priv', $val, 'default', 0);
+    }
+
+    public function getToken()
+    {
+        return Mage::getStoreConfig('w_cube/settings/token', 0);
+    }
+
+    public function setToken($token)
+    {
+        Mage::getConfig()->saveConfig('w_cube/settings/token', $token, 'default', 0);
+    }
+
+    public function registerAutoloader()
+    {
+        $libDir = Mage::getBaseDir('lib');
+        $autoloader = $libDir . DS . implode(DS, array('sc', 'connector', 'vendor', 'autoload.php'));
+        return require_once($autoloader);
+    }
+
+
+    public function getScRsa()
+    {
+        if (!isset($this->_scRsa)) {
+            $this->registerAutoloader();
+            $this->_scRsa = new Crypt_RSA();
+            $this->_scRsa->loadKey($this->getToken());
+            $this->_scRsa->setSaltLength(128);
+        }
+
+        return $this->_scRsa;
+    }
+
+    public function getCandidateRsa()
+    {
+        if (!isset($this->_cRsa)) {
+            $this->registerAutoloader();
+            $this->_cRsa = new Crypt_RSA();
+            $this->_cRsa->loadKey($this->getCandidatePrivateKey());
+            $this->_cRsa->setSaltLength(128);
+        }
+
+        return $this->_cRsa;
+    }
+
+    public function getRsa()
+    {
+        if (!isset($this->_rsa)) {
+            $this->registerAutoloader();
+            $this->_rsa = new Crypt_RSA();
+            $this->_rsa->loadKey($this->getPrivateKey());
+            $this->_rsa->setSaltLength(128);
+        }
+
+        return $this->_rsa;
+    }
+
+    public function encrypt($key, $data)
+    {
+        $this->registerAutoloader();
+        $cipher = new Crypt_AES();
+        $cipher->setKey($key);
+        $iv = crypt_random_string($cipher->getBlockLength() >> 3);
+        $cipher->setIV($iv);
+        return array($iv, base64_encode($cipher->encrypt($data)));
+    }
+
+    public function verifySignature($baseStr, $sig)
+    {
+        return $this->getScRsa()->verify($baseStr, base64_decode($sig));
+    }
+
+    public function auth($request)
+    {
+        $baseUrl = Mage::getStoreConfig('w_cube/settings/base_url', 0);
+        $method = strtoupper($request->getMethod());
+        $url = strtolower(rtrim($baseUrl, '/') . $request->getOriginalPathInfo());
+        $paramsBase = array();
+        $params = $request->getParams();
+        ksort($params, SORT_STRING);
+        foreach ($params as $key=>$value) {
+            $paramsBase[] = $key . "=" . $value;
+        }
+
+        $paramsBase = implode('&', $paramsBase);
+        $nonce = $request->getHeader('SC-NONCE');
+        $timestamp = $request->getHeader('SC-TIMESTAMP');
+        $sig = $request->getHeader('SC-AUTHORIZATION');
+        if ($nonce && $timestamp && $sig) {
+            $baseStr = implode('&', array($method, $url, $paramsBase, $nonce, $timestamp));
+            return $this->checkTimestamp($timestamp)
+                && $this->getResource()->checkNonce($nonce)
+                && $this->verifySignature($baseStr, $sig);
+        }
+
+        return False;
+    }
+
+    public function getResource()
+    {
+        return Mage::getResourceModel('wCube/main');
+    }
+
+    public function checkTimestamp($timestamp)
+    {
+        $currentTs = (int)Mage::getSingleton('core/date')->gmtTimestamp();
+        return abs($currentTs - (int)$timestamp) < self::TIMESTAMP_GAP;
+    }
+
+    public function getKeyBySession($session)
+    {
+        $key = $this->getResource()->getKeyBySession($session);
+        if ($key)
+            return $this->cleanKey($key);
+        return False;
+    }
+
+    public function cleanKey($key)
+    {
+        return $this->getRsa()->decrypt(base64_decode($key));
+    }
+
+
 }

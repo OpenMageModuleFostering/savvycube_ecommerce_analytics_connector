@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Magento
  *
@@ -15,215 +14,102 @@
  *
  * @category   SavvyCube
  * @package    SavvyCube_Connector
- * @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+ * @copyright  Copyright (c) 2017 SavvyCube
+ * SavvyCube is a trademark of Webtex Solutions, LLC
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 class SavvyCube_Connector_ApiController extends Mage_Core_Controller_Front_Action
 {
-    private function _authorize()
-    {
-        if (!$this->getAuthHelper()->checkRequest()) {
-            Mage::app()->getResponse()
-                ->setHeader('HTTP/1.1', '401 Unauthorized')
-                ->setBody('<h1>401 Unauthorized</h1>')
-                ->sendResponse();
-            exit;
-        }
-    }
 
-    private function formatResponse($data, $encrypt)
-    {
-        if ($encrypt) {
-            Mage::app()->getResponse()->setHeader('Content-Type', 'text/plain');
-            Mage::app()->getResponse()->setHeader('Content-Encoding', 'gzip');
-            Mage::app()->getResponse()->setBody(
-                $this->encrypt(Mage::helper('core')->jsonEncode($data))
-            );
-        } else {
-            Mage::app()->getResponse()->setHeader('Content-Type', 'application/json');
-            Mage::app()->getResponse()->setBody(
-                Mage::helper('core')->jsonEncode($data)
-            );
-        }
-    }
 
-    private function encrypt($data)
-    {
-        $key = $this->getAuthHelper()->getCurrentKey('e');
-
-        return rtrim(
-            base64_encode(
-                mcrypt_encrypt(
-                    MCRYPT_RIJNDAEL_128,
-                    $key,
-                    gzencode($data),
-                    MCRYPT_MODE_ECB,
-                    mcrypt_create_iv(
-                        mcrypt_get_iv_size(
-                            MCRYPT_RIJNDAEL_128,
-                            MCRYPT_MODE_ECB
-                        ),
-                        MCRYPT_DEV_URANDOM
-                    )
-                )
-            ),
-            "\0"
-        );
-
-    }
-
-    /**
-     * Authorization Helper
-     *
-     * @return SavvyCube_Connector_Helper_Authorization
-     */
     protected function getAuthHelper()
     {
         return Mage::helper('wCube/authorization');
     }
 
-    public function dispatch($action)
+    public function indexAction()
     {
-        $this->_authorize();
-        try {
-            $apiResource = Mage::getModel('wCube/api_' . $action);
-            $method = strtolower($this->getRequest()->getMethod()) . "Method";
-            try {
-                $parameters = $this->_getParameters();
-            } catch (Exception $e) {
-                Mage::app()->getResponse()
-                    ->setHeader('HTTP/1.1', '404 Not Found')
-                    ->setBody($e->getMessage())
-                    ->sendResponse();
-                exit;
-            }
-
-            if (!$apiResource) {
-                Mage::app()->getResponse()
-                    ->setHeader('HTTP/1.1', '404 Not Found')
-                    ->setBody('<h1>404: Api resource not found</h1>')
-                    ->sendResponse();
-                exit;
+        if (!$this->getAuthHelper()->auth($this->getRequest())) {
+            $error = array('401 Unauthorized', '');
+        } else {
+            $session = $this->getRequest()->getHeader('Sc-Session');
+            $key = $this->getAuthHelper()->getKeyBySession($session);
+            if (!$key) {
+                $error = array('401 Unauthorized', 'Session is missing');
             } else {
-                if (($this->_isEncryptionRequired($action, $this->getRequest()->getMethod())
-                    && !$this->getAuthHelper()->getCurrentKey('e'))
-                ) {
-                    Mage::app()->getResponse()
-                        ->setHeader('HTTP/1.1', '401 Unauthorized')
-                        ->setBody('no encryption key')
-                        ->sendResponse();
-                    exit;
+                $resource = $this->getRequest()->getActionName();
+                $method = $this->getRequest()->getMethod();
+                $params = $this->getRequest()->getParams();
+
+                $method = strtolower($this->getRequest()->getMethod()) . "Method";
+                $apiResource = Mage::getModel('wCube/api_' . $resource);
+
+                if (!$apiResource) {
+                    $error = array('500 Internal Server Error', 'No resource model');
                 } elseif (!is_callable(array($apiResource, $method))) {
-                    Mage::app()->getResponse()
-                        ->setHeader('HTTP/1.1', '404 Not Found')
-                        ->setBody('<h1>404: method is not supported for this Api resource</h1>')
-                        ->sendResponse();
-                    exit;
+                    $error = array('500 Internal Server Error', 'Unknown method');
+                } elseif ($apiResource->init($params)->$method()) {
+                    $apiResource->formatResponse($key);
+                } else {
+                    $error = $apiResource->error;
                 }
-            }
-
-            Varien_Profiler::start(self::PROFILER_KEY . '::predispatch');
-            $this->preDispatch();
-            Varien_Profiler::stop(self::PROFILER_KEY . '::predispatch');
-
-            if ($this->getRequest()->isDispatched()) {
-                /**
-                 * preDispatch() didn't change the action, so we can continue
-                 */
-                if (!$this->getFlag('', self::FLAG_NO_DISPATCH)) {
-                    $_profilerKey = self::PROFILER_KEY . '::' . $this->getFullActionName();
-
-                    Varien_Profiler::start($_profilerKey);
-                    $response = $apiResource->init($parameters)->$method();
-                    $this->formatResponse($response, $this->_isEncryptionRequired($action, $this->getRequest()->getMethod()));
-                    Varien_Profiler::stop($_profilerKey);
-
-                    Varien_Profiler::start(self::PROFILER_KEY . '::postdispatch');
-                    $this->postDispatch();
-                    Varien_Profiler::stop(self::PROFILER_KEY . '::postdispatch');
-                }
-            }
-        } catch (Mage_Core_Controller_Varien_Exception $e) {
-            // set prepared flags
-            foreach ($e->getResultFlags() as $flagData) {
-                list($action, $flag, $value) = $flagData;
-                $this->setFlag($action, $flag, $value);
-            }
-            // call forward, redirect or an action
-            list($method, $parameters) = $e->getResultCallback();
-            switch ($method) {
-                case Mage_Core_Controller_Varien_Exception::RESULT_REDIRECT:
-                    list($path, $arguments) = $parameters;
-                    $this->_redirect($path, $arguments);
-                    break;
-                case Mage_Core_Controller_Varien_Exception::RESULT_FORWARD:
-                    list($action, $controller, $module, $params) = $parameters;
-                    $this->_forward($action, $controller, $module, $params);
-                    break;
-                default:
-                    $actionMethodName = $this->getActionMethodName($method);
-                    $this->getRequest()->setActionName($method);
-                    $this->$actionMethodName($method);
-                    break;
             }
         }
+
+        if (isset($error)) {
+            list ($header, $body) = $error;
+            Mage::app()->getResponse()
+                ->setHeader('HTTP/1.1', $header)
+                ->setBody($body);
+        }
     }
+
+    public function authAction()
+    {
+        if (!$this->getAuthHelper()->auth($this->getRequest())) {
+            Mage::app()->getResponse()
+                ->setHeader('HTTP/1.1', '401 Unauthorized');
+        } else {
+            $this->getAuthHelper()->getResource()->cleanSession();
+            $this->getAuthHelper()->getResource()->cleanNonce();
+            $key = $this->getRequest()->getParam('key');
+            $session = $this->getAuthHelper()->getResource()->createSession($key);
+            $key = $this->getAuthHelper()->getKeyBySession($session);
+            $key = base64_encode($this->getAuthHelper()->getScRsa()->encrypt($key));
+            Mage::app()->getResponse()->setHeader('Sc-Session', $session);
+            Mage::app()->getResponse()->setHeader('Sc-Key', $key);
+        }
+
+    }
+
+    public function checkAction()
+    {
+        $session = (int)$this->getRequest()->getParam('session');
+        $result = $this->getAuthHelper()->candidateSignature($session);
+        if ($result) {
+            list($iv, $signature) = $result;
+            Mage::app()->getResponse()->setHeader('Sc-Sig', $signature);
+            Mage::app()->getResponse()->setHeader('Sc-Iv', $iv);
+        } else {
+            Mage::app()->getResponse()
+                ->setHeader('HTTP/1.1', '401 Unauthorized');
+        }
+    }
+
 
     /**
-     * get parameters from request which matching with configuration
+     * Retrieve action method name
      *
-     * @throws Exception
-     * @return array
+     * @param string $action
+     * @return string
      */
-    private function _getParameters()
+    public function getActionMethodName($action)
     {
-        return array_merge(
-            $this->_getParametersByAction('default', $this->getRequest()->getMethod()),
-            $this->_getParametersByAction($this->getRequest()->getActionName(), $this->getRequest()->getMethod())
-        );
-    }
+        if (strtolower($action) == 'auth')
+            return 'authAction';
+        if (strtolower($action) == 'check')
+            return 'checkAction';
 
-    private function _isEncryptionRequired($action, $method)
-    {
-        /** @var Varien_Simplexml_Element $doNotEncryptNode */
-        $doNotEncryptNode = Mage::getConfig()->getNode("default/wCube/donotencrypt");
-        if ($doNotEncryptNode && $doNotEncryptNode->hasChildren()) {
-            $doNotEncryptArray = $doNotEncryptNode->asArray();
-            $action = strtolower($action);
-            $method = strtoupper($method);
-            return !isset($doNotEncryptArray[$action][$method]);
-        }
-
-        return true;
-    }
-
-    private function _getParametersByAction($action, $method)
-    {
-        $parameters = array();
-        $result = array();
-        /** @var Varien_Simplexml_Element $actionNode */
-        $actionNode = Mage::getConfig()->getNode("default/wCube/parameters/{$action}");
-        if ($actionNode && $actionNode->hasChildren()) {
-            $actionArray = $actionNode->asArray();
-            if (array_key_exists($method, $actionArray)) {
-                $parameters = $actionArray[$method];
-            }
-        }
-        if (is_array($parameters)) {
-            foreach ($parameters as $name => $options) {
-                $value = $this->getRequest()->getParam($name, isset($options['default']) ? $options['default'] : null);
-                if (isset($option['required']) && $options['required'] && $value === null) {
-                    throw new Exception('Missing required parameter:' . $name);
-                }
-                $result[$name] = $value;
-            }
-        }
-
-        return $result;
-    }
-
-    public function hasAction($action)
-    {
-        return true;
+        return 'indexAction';
     }
 }

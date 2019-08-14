@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Magento
  *
@@ -15,20 +14,27 @@
  *
  * @category   SavvyCube
  * @package    SavvyCube_Connector
- * @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+ * @copyright  Copyright (c) 2017 SavvyCube
+ * SavvyCube is a trademark of Webtex Solutions, LLC
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 abstract class SavvyCube_Connector_Model_Api_Abstract
 {
-    const EXISTENCE_PREFIX = 'wcube_if_exists';
+    protected $_request;
 
-    protected $request;
+    protected $_queryTime = 0;
 
-    protected $mainTable = '';
+    protected $_count = 0;
 
-    protected $versionColumns = array();
+    protected $_data = null;
 
-    protected $parentEntity = array();
+    protected $_mainTable = '';
+
+    protected $_parentEntity = array();
+
+    protected $_order = 'main_table.entity_id';
+
+    public $error = null;
 
     /**
      * Render response
@@ -37,38 +43,32 @@ abstract class SavvyCube_Connector_Model_Api_Abstract
      */
     public function getMethod()
     {
-        if (!empty($this->parentEntity)) {
-            /** @var SavvyCube_Connector_Model_Api_Abstract $parentModel */
-            $parentModel = Mage::getModel($this->parentEntity['model']);
-            $affectedParent = $parentModel->generateQuery()->columns('entity_id');
-            $this->applyDateLimit($affectedParent, $this->parentEntity['parent_date']);
-            $affectedParentIds = $this->getHelper()->getDbRead()->fetchAll(
-                $affectedParent,
-                $affectedParent->getBind(),
-                Zend_Db::FETCH_COLUMN
+        if (!empty($this->_parentEntity)) {
+            $this->_data = $this->getResult(
+                $this->generateQuery()
+                    ->joinLeft(
+                        array('parent_table' => $this->_parentEntity['table']),
+                        "parent_table.entity_id = main_table.{$this->_parentEntity['parent_fk']}"
+                    )
+                    ->reset(Varien_Db_Select::COLUMNS)
+                    ->columns($this->columnsListForGet()),
+                'parent_table.updated_at'
             );
-
-            if (count($affectedParentIds)) {
-                return $this->getResult(
-                    $this->generateQuery()
-                        ->columns($this->columnsListForGet())
-                        ->where("`main_table`.{$this->parentEntity['parent_fk']} in (?)", $affectedParentIds)
-                );
-            } else {
-                return array();
-            }
+            return true;
         } else {
-            $sql = $this->generateQuery()
-                ->columns($this->columnsListForGet());
-
-            return $this->getResult($sql, '`main_table`.updated_at');
+            $this->_data = $this->getResult(
+                $this->generateQuery()->columns($this->columnsListForGet()),
+                '`main_table`.updated_at'
+            );
+            return true;
         }
     }
 
     public function generateQuery()
     {
         return $this->getHelper()->getDbRead()->select()
-            ->from(array('main_table' => $this->getHelper()->getTableName($this->mainTable)))
+            ->from(array('main_table' => $this->getHelper()->getTableName($this->_mainTable)))
+            ->order($this->_order)
             ->reset(Varien_Db_Select::COLUMNS);
     }
 
@@ -80,69 +80,51 @@ abstract class SavvyCube_Connector_Model_Api_Abstract
     {
         $bind = array();
 
-        $fromDate = false;
-        $toDate = false;
-
-        if ($this->request['from_date'] !== null) {
-            $fromDate = urldecode($this->request['from_date']);
-        }
-        if ($this->request['to_date'] !== null) {
-            $toDate = urldecode($this->request['to_date']);
+        if (isset($this->_request['from'])) {
+            $query->where("{$dateColumn} >= :fromDate");
+            $bind[":fromDate"] = $this->_request['from'];
         }
 
-        $conditions = array();
-        if ($fromDate) {
-            $conditions[] = "{$dateColumn} > :fromDate";
-            $bind[":fromDate"] = $fromDate;
-        }
-        if ($fromDate) {
-            $conditions[] = "{$dateColumn} <= :toDate";
-            $bind[":toDate"] = $toDate;
+        if (isset($this->_request['to'])) {
+            $query->where("{$dateColumn} <= :toDate");
+            $bind[":toDate"] = $this->_request['to'];
         }
 
-        foreach ($conditions as $condition) {
-            $query->where($condition);
-        }
         $query->bind(array_merge($query->getBind(), $bind));
     }
 
     /**
-     * init model and set $request array
+     * init model and set $_request array
      *
-     * @param array $request
+     * @param array $params
      *
      * @return $this
      */
-    public function init($request)
+    public function init($params)
     {
-        $this->request = $request;
+        $this->_request = array();
+        $this->_request['offset'] = array_key_exists('offset', $params) ? $params['offset'] : 0;
+        $this->_request['count'] = array_key_exists('count', $params) ? $params['count'] : 100;
+        $this->_request['from'] = array_key_exists('from', $params) ? urldecode($params['from']) : null;
+        $this->_request['to'] = array_key_exists('to', $params) ? urldecode($params['to']) : null;
         return $this;
     }
 
-    /**
-     * init sql select with order status date filter
-     *
-     * @return Varien_Db_Select
-     */
-    protected function getAffectedOrders()
+    public function formatResponse($key)
     {
-        $fromDate = false;
-        $toDate = false;
-
-        if ($this->request['from_date'] !== null) {
-            $fromDate = urldecode($this->request['from_date']);
-        }
-        if ($this->request['to_date'] !== null) {
-            $toDate = urldecode($this->request['to_date']);
-        }
-
-        if (!$fromDate && !$toDate) {
-            return true;
-        } else {
-            /** @var SavvyCube_Connector_Helper_Data $helper */
-            $helper = Mage::helper('wCube');
-            return $helper->getAffectedOrdersIds($fromDate, $toDate);
-        }
+        Mage::app()->getResponse()->setHeader(
+            'sc-version',
+            $this->getHelper()->getCurrentModuleVersion()
+        );
+        Mage::app()->getResponse()->setHeader('sc-query-time', $this->_queryTime);
+        Mage::app()->getResponse()->setHeader('sc-report-count', $this->_count);
+        $options = 0;
+        $data = json_encode($this->_data, $options);
+        list($iv, $encryptedData) = $this->getAuthHelper()->encrypt($key, $data);
+        $signature = $this->getAuthHelper()->getRsa()->sign($encryptedData);
+        Mage::app()->getResponse()->setHeader('Sc-Sig', base64_encode($signature));
+        Mage::app()->getResponse()->setHeader('Sc-Iv', base64_encode($iv));
+        Mage::app()->getResponse()->setBody($encryptedData);
     }
 
     protected function getResult($query, $dateColumn = false)
@@ -150,8 +132,13 @@ abstract class SavvyCube_Connector_Model_Api_Abstract
         if ($dateColumn) {
             $this->applyDateLimit($query, $dateColumn);
         }
+
         $this->renderParameters($query);
-        return $this->getHelper()->getDbRead()->fetchAll($query, $query->getBind());
+        $start = microtime(true);
+        $report = $this->getHelper()->getDbRead()->fetchAll($query, $query->getBind());
+        $this->_count = count($report);
+        $this->_queryTime += microtime(true) - $start;
+        return $report;
     }
 
     /**
@@ -161,8 +148,8 @@ abstract class SavvyCube_Connector_Model_Api_Abstract
      */
     protected function renderParameters($sql)
     {
-        if ($this->request['count'] !== null && $this->request['offset'] !== null) {
-            $sql->limit($this->request['count'], $this->request['offset']);
+        if (isset($this->_request['count']) && isset($this->_request['offset'])) {
+            $sql->limit($this->_request['count'], $this->_request['offset']);
         }
     }
 
@@ -174,68 +161,41 @@ abstract class SavvyCube_Connector_Model_Api_Abstract
         return Mage::helper('wCube');
     }
 
+    protected function getAuthHelper()
+    {
+        return Mage::helper('wCube/authorization');
+    }
+
     /**
      * Return columns list for getMethod select
      *
      * @return string | array
      */
-    protected function columnsListForGet()
+    public function columnsListForGet()
     {
         return '*';
     }
 
-    public function prepareColumns($columns, $tableAlias = false)
+    public function prepareColumns($columns, $table, $tableAlias = false, $aliases = array())
     {
         $result = array();
-        foreach ($columns as $key => $column) {
-            if (is_string($key)) {
-                $columnAlias = $key;
-            }
-            if (isset($this->versionColumns[$column])) {
-                $versionInfo = $this->versionColumns[$column];
-                if (isset($versionInfo['check_existence']) && !$this->checkColumn($this->mainTable, $column)
-                    || isset($versionInfo['since']) && Mage::getVersion() < $versionInfo['since']
-                ) {
-                    /** skip missing columns */
-                    continue;
-                } elseif (isset($versionInfo['renamed']) && Mage::getVersion() < $versionInfo['renamed']['since']) {
-                    if (!isset($columnAlias)) {
-                        $columnAlias = $column;
-                    }
-                    $column = $versionInfo['renamed']['originally'];
-                }
-            }
-            if (!isset($columnAlias)) {
-                $columnAlias = $column;
-            }
-            if ($tableAlias) {
-                $column = "{$tableAlias}.{$column}";
-            }
-
-            $result[$columnAlias] = $column;
-            unset($columnAlias);
-        }
-        return $result;
-    }
-
-    public function checkColumn($table, $columnName)
-    {
-        $result = Mage::app()->getCache()->load(self::EXISTENCE_PREFIX . $table . $columnName);
-        if (!$result) {
-            $columns = $this->getHelper()->getDbRead()->describeTable(
-                $this->getHelper()->getTableName($this->mainTable)
+        $columns = array_flip($columns);
+        if ($this->getHelper()->getDbRead()->isTableExists($table)) {
+            $tableDescription = $this->getHelper()->getDbRead()->describeTable(
+                $this->getHelper()->getTableName($table)
             );
-            $result = '';
-            foreach ($columns as $column) {
-                if ($column['COLUMN_NAME'] == $columnName) {
-                    $result = $columnName;
-                    break;
+            foreach ($tableDescription as $column) {
+                if (isset($columns[$column['COLUMN_NAME']])) {
+                    $result[isset($aliases[$column['COLUMN_NAME']])
+                        ? $aliases[$column['COLUMN_NAME']]
+                        : $column['COLUMN_NAME']]
+                        = $tableAlias
+                        ? "{$tableAlias}.{$column['COLUMN_NAME']}"
+                        : $column['COLUMN_NAME'];
                 }
             }
-
-            Mage::app()->getCache()->save($result, self::EXISTENCE_PREFIX . $table . $columnName);
         }
 
-        return $result == $columnName;
+        return $result;
     }
 }

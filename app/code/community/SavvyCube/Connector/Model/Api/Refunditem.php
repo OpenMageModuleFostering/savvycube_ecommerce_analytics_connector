@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Magento
  *
@@ -15,26 +14,17 @@
  *
  * @category   SavvyCube
  * @package    SavvyCube_Connector
- * @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+ * @copyright  Copyright (c) 2017 SavvyCube
+ * SavvyCube is a trademark of Webtex Solutions, LLC
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 class SavvyCube_Connector_Model_Api_Refunditem extends SavvyCube_Connector_Model_Api_Abstract
 {
-    protected $mainTable = 'sales_flat_creditmemo_item';
+    protected $_mainTable = 'sales_flat_creditmemo_item';
 
-    protected $parentEntity = array(
-        'model' => 'wCube/api_refund',
-        'parent_date' => 'updated_at',
+    protected $_parentEntity = array(
+        'table' => 'sales_flat_creditmemo',
         'parent_fk' => 'parent_id'
-    );
-
-    protected $versionColumns = array(
-        'base_weee_tax_applied_row_amnt' => array(
-            'renamed' => array(
-                'since' => '1.6.0.0',
-                'originally' => 'base_weee_tax_applied_row_amount'
-            )
-        )
     );
 
     /**
@@ -42,29 +32,31 @@ class SavvyCube_Connector_Model_Api_Refunditem extends SavvyCube_Connector_Model
      *
      * @return string | array
      */
-    protected function columnsListForGet()
+    public function columnsListForGet()
     {
         return $this->prepareColumns(
             array(
-                'entity_id',
-                'parent_id',
+                'base_discount_amount',
+                'base_hidden_tax_amount',
+                'base_tax_amount',
+                'qty',
                 'base_price',
                 'base_row_total',
-                'base_discount_amount',
-                'base_tax_amount',
-                'base_price_incl_tax',
-                'qty',
                 'base_cost',
-                'base_row_total_incl_tax',
-                'product_id',
+                'entity_id',
                 'order_item_id',
-                'base_hidden_tax_amount',
-                'base_weee_tax_disposition',
-                'base_weee_tax_row_disposition',
-                'base_weee_tax_applied_amount',
-                'base_weee_tax_applied_row_amnt',
+                'parent_id'
             ),
-            'main_table'
+            $this->_mainTable,
+            'main_table',
+            array(
+                'base_discount_amount' => 'discount_amount',
+                'base_hidden_tax_amount' => 'hidden_tax_amount',
+                'base_tax_amount' => 'tax_amount',
+                'base_price' => 'price',
+                'base_row_total' => 'row_total',
+                'base_cost' => 'cost',
+            )
         );
     }
 }

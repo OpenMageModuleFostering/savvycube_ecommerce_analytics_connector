@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Magento
  *
@@ -15,69 +14,60 @@
  *
  * @category   SavvyCube
  * @package    SavvyCube_Connector
- * @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+ * @copyright  Copyright (c) 2017 SavvyCube
+ * SavvyCube is a trademark of Webtex Solutions, LLC
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 class SavvyCube_Connector_Model_Api_Invoice extends SavvyCube_Connector_Model_Api_Abstract
 {
-    protected $mainTable = 'sales_flat_invoice';
-
-    protected $versionColumns = array(
-        'discount_description' => array(
-            'check_existence' => true
-        ),
-        'base_total_refunded' => array(
-            'since' => '1.6.0.0'
-        ),
-        'base_shipping_hidden_tax_amnt' => array(
-            'renamed' => array(
-                'since' => '1.6.0.0',
-                'originally' => 'base_shipping_hidden_tax_amount'
-            )
-        )
-    );
+    protected $_mainTable = 'sales_flat_invoice';
 
     /**
      * Return columns list for getMethod select
      *
      * @return string | array
      */
-    protected function columnsListForGet()
+    public function columnsListForGet()
     {
         return $this->prepareColumns(
             array(
-               'entity_id',
-               'base_grand_total',
-               'base_tax_amount',
-               'store_to_order_rate',
-               'base_shipping_tax_amount',
-               'base_discount_amount',
-               'base_to_order_rate',
-               'store_to_base_rate',
-               'base_shipping_amount',
-               'total_qty',
-               'base_to_global_rate',
-               'base_subtotal',
-               'billing_address_id',
-               'is_used_for_refund',
-               'order_id',
-               'state',
-               'shipping_address_id',
-               'store_currency_code',
-               'transaction_id',
-               'order_currency_code',
-               'base_currency_code',
-               'global_currency_code',
-               'increment_id',
-               'created_at',
-               'updated_at',
-               'base_hidden_tax_amount',
-               'base_shipping_hidden_tax_amnt',
-               'base_shipping_incl_tax',
-               'base_total_refunded',
-               'discount_description',
+                'base_discount_amount',
+                'base_hidden_tax_amount',
+                'base_shipping_hidden_tax_amnt',
+                'base_shipping_hidden_tax_amount',
+                'base_tax_amount',
+                'base_shipping_tax_amount',
+                'base_shipping_amount',
+                'base_subtotal',
+                'base_grand_total',
+                'base_currency_code',
+                'base_to_global_rate',
+                'base_to_order_rate',
+                'global_currency_code',
+                'order_currency_code',
+                'store_currency_code',
+                'store_to_base_rate',
+                'store_to_order_rate',
+                'entity_id',
+                'increment_id',
+                'order_id',
+                'transaction_id',
+                'created_at',
+                'updated_at',
             ),
-            'main_table'
+            $this->_mainTable,
+            'main_table',
+            array(
+                'base_discount_amount' => 'discount_amount',
+                'base_hidden_tax_amount' => 'hidden_tax_amount',
+                'base_shipping_hidden_tax_amnt' => 'shipping_hidden_tax_amnt',
+                'base_shipping_hidden_tax_amount' => 'shipping_hidden_tax_amnt',
+                'base_tax_amount' => 'tax_amount',
+                'base_shipping_tax_amount' => 'shipping_tax_amount',
+                'base_shipping_amount' => 'shipping_amount',
+                'base_subtotal' => 'subtotal',
+                'base_grand_total' => 'grand_total',
+            )
         );
     }
 }
