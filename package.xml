@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package>
+    <name>SavvyCube_Ecommerce_Analytics_Connector</name>
+    <version>0.0.7</version>
+    <stability>stable</stability>
+    <license uri="http://opensource.org/licenses/osl-3.0.php">Open Software License (OSL v3.0)</license>
+    <channel>community</channel>
+    <extends/>
+    <summary>SavvyCube Ecommerce Analytics Connector</summary>
+    <description>SavvyCube is a simple and precise ecommerce metrics and predictive analytics. Use this extension to connect your Magento store to your SavvyCube account.</description>
+    <notes>Stable public release</notes>
+    <authors><author><name>Webtex Software</name><user>Webtex</user><email>info@webtexsoftware.com</email></author></authors>
+    <date>2015-03-04</date>
+    <time>10:40:29</time>
+    <contents><target name="magecommunity"><dir name="SavvyCube"><dir name="Connector"><dir name="Block"><dir name="Config"><file name="Activate.php" hash="6c6f49704138e9f8ad2eb3087d5ab9cf"/><file name="Version.php" hash="d33ed5f1e15aad06229a1c2beefdb3cf"/></dir></dir><file name="CHANGELOG.md" hash="7e80d461baa503d12e559b11d7254146"/><dir name="Helper"><file name="Authorization.php" hash="90cf373542ccad1b1042e6dcbdc4de48"/><file name="Data.php" hash="5221d06ae0cc8e96c362dc521c678f86"/></dir><dir name="Model"><dir name="Api"><file name="Abstract.php" hash="c22fc066b11d0b2bcece73f4b64bd780"/><file name="Address.php" hash="ae28375fc0c1a2d9517d2f0e784d35a4"/><file name="Invoice.php" hash="7081d4d22a49c0435517988264e39554"/><file name="Invoiceitem.php" hash="918632b4ed4b00b47dc6c6091bc63fff"/><file name="Notification.php" hash="15431472c0b3eba58b1d29f0100fc338"/><file name="Order.php" hash="440d45dd8c8d0ca56fc4cad296f7fbda"/><file name="Orderitem.php" hash="581367c762a833d784f38bec0f52ea66"/><file name="Refund.php" hash="fd32905e72b6fdfc6592894bb46a4043"/><file name="Refunditem.php" hash="43d7f18578eb6b00fb368be64c1a82d0"/><file name="Shipment.php" hash="314352a8884447a0bb9711e36815dacc"/><file name="Shipmentitem.php" hash="c0eeda775adf8daf403f9b76a71382c3"/><file name="Transaction.php" hash="6aee9e051371e9e99e5ef85396606c84"/><file name="Version.php" hash="a8f62976f3fb5bf7db781a51a49e2a04"/></dir><file name="Nonce.php" hash="e539f97a43a1a9ff6c05617527ac5099"/></dir><dir name="cert"><file name="x509.crt" hash="17c7a49283a1df8909f9b2e068664daf"/></dir><dir name="controllers"><dir name="Adminhtml"><file name="IndexController.php" hash="16814a2180e3c0f246520acfec75be6f"/></dir><file name="ApiController.php" hash="7e4e68bc802b23ebf8faf5dbcce03e4c"/></dir><dir name="etc"><file name="adminhtml.xml" hash="6b0ca0c3c1d3427a761373094df46039"/><file name="config.xml" hash="80e802c72abcabce4a393305081fc876"/><file name="system.xml" hash="313c59a52430ba720ab3211229d74297"/></dir><dir name="sql"><dir name="wCube_setup"><file name="mysql4-install-0.0.1.php" hash="790e03ae38f3a37e3d61ddda9bceb8de"/><file name="mysql4-upgrade-0.0.4-0.0.5.php" hash="a6c950adf5d247ae35b7846d9cca3c65"/></dir></dir></dir></dir></target><target name="mageetc"><dir name="modules"><file name="SavvyCube_Connector.xml" hash="9c75d06abd6476e6e169b3fed17b08b6"/></dir></target></contents>
+    <compatible/>
+    <dependencies><required><php><min>5.2.0</min><max>6.0.0</max></php></required></dependencies>
+</package>

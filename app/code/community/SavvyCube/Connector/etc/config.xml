@@ -1,0 +1,149 @@
+<?xml version="1.0"?>
+<!--
+/**
+* Magento
+*
+* NOTICE OF LICENSE
+*
+* This source file is subject to the Open Software License (OSL 3.0)
+* that is bundled with this package in the file LICENSE.txt.
+* It is also available through the world-wide-web at this URL:
+* http://opensource.org/licenses/osl-3.0.php
+* If you did not receive a copy of the license and are unable to
+* obtain it through the world-wide-web, please send an email
+* to license@savvycube.com so we can send you a copy immediately.
+*
+* @category   SavvyCube
+* @package    SavvyCube_Connector
+* @copyright  Copyright (c) 2014 SavvyCube (http://www.savvycube.com). SavvyCube is a trademark of Webtex Solutions, LLC (http://www.webtexsoftware.com).
+* @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+*/
+-->
+<config>
+    <modules>
+        <SavvyCube_Connector>
+            <version>0.0.7</version>
+        </SavvyCube_Connector>
+    </modules>
+    <global>
+        <models>
+            <wCube>
+                <class>SavvyCube_Connector_Model</class>
+                <resourceModel>wCube_resource</resourceModel>
+            </wCube>
+            <wCube_resource>
+                <class>SavvyCube_Connector_Model_Resource</class>
+                <entities>
+                    <nonce>
+                        <table>wCube_nonce_cache</table>
+                    </nonce>
+                </entities>
+            </wCube_resource>
+        </models>
+        <blocks>
+            <wCube>
+                <class>SavvyCube_Connector_Block</class>
+            </wCube>
+        </blocks>
+        <helpers>
+            <wCube>
+                <class>SavvyCube_Connector_Helper</class>
+            </wCube>
+        </helpers>
+        <resources>
+            <wCube_setup>
+                <setup>
+                    <module>SavvyCube_Connector</module>
+                    <class>Mage_Core_Model_Resource_Setup</class>
+                </setup>
+            </wCube_setup>
+        </resources>
+    </global>
+    <admin>
+        <routers>
+            <wCubeAdmin>
+                <use>admin</use>
+                <args>
+                    <module>SavvyCube_Connector</module>
+                    <frontName>wCubeAdmin</frontName>
+                </args>
+            </wCubeAdmin>
+        </routers>
+    </admin>
+    <frontend>
+        <routers>
+            <wCube>
+                <use>standard</use>
+                <args>
+                    <module>SavvyCube_Connector</module>
+                    <frontName>wCube</frontName>
+                </args>
+            </wCube>
+        </routers>
+    </frontend>
+    <default>
+        <wCube>
+            <cube_crypt>
+                <open_key_file_path><![CDATA[cert/x509.crt]]></open_key_file_path>
+                <consumer_endpoint><![CDATA[http://app.savvycube.com/]]></consumer_endpoint>
+                <nonce_lifetime>5</nonce_lifetime>
+            </cube_crypt>
+            <parameters>
+                <default>
+                    <GET>
+                        <offset/>
+                        <count/>
+                        <from_date/>
+                        <to_date/>
+                    </GET>
+                </default>
+                <address>
+                    <GET/>
+                </address>
+                <order>
+                    <GET/>
+                </order>
+                <orderitem>
+                    <GET/>
+                </orderitem>
+                <invoice>
+                    <GET/>
+                </invoice>
+                <invoiceitem>
+                    <GET/>
+                </invoiceitem>
+                <refund>
+                    <GET/>
+                </refund>
+                <refunditem>
+                    <GET/>
+                </refunditem>
+                <shipment>
+                    <GET/>
+                </shipment>
+                <shipmentitem>
+                    <GET/>
+                </shipmentitem>
+                <transaction>
+                    <GET/>
+                </transaction>
+                <version>
+                    <GET>
+                        <version/>
+                    </GET>
+                </version>
+                <notification>
+                    <GET>
+                        <description/>
+                        <title/>
+                    </GET>
+                </notification>
+            </parameters>
+            <donotencrypt>
+                <notification>
+                    <GET/>
+                </notification>
+            </donotencrypt>
+        </wCube>
+    </default>
+</config>
