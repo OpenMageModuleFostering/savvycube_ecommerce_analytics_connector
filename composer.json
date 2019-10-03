@@ -1,7 +1,7 @@
 {
-    "name": "OpenMageModuleFostering\/SavvyCube_Ecommerce_Analytics_Connector",
+    "name": "openmage-module-fostering\/savvycube_ecommerce_analytics_connector",
     "type": "magento-module",
-    "license": "Open-Software-License-(OSL-v3.0)",
+    "license": "OSL-3.0",
     "homepage": "",
     "description": "SavvyCube Ecommerce Analytics Connector",
     "authors": [
