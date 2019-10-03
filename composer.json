@@ -1,16 +1,19 @@
 {
-    "name": "OpenMageModuleFostering/SavvyCube_Ecommerce_Analytics_Connector",
+    "name": "OpenMageModuleFostering\/SavvyCube_Ecommerce_Analytics_Connector",
     "type": "magento-module",
     "license": "Open-Software-License-(OSL-v3.0)",
     "homepage": "",
     "description": "SavvyCube Ecommerce Analytics Connector",
     "authors": [
-    {
-        "name": "Webtex Software",
-        "email": "info@webtexsoftware.com"
-    }
-],
+        {
+            "name": "Webtex Software",
+            "email": "info@webtexsoftware.com"
+        }
+    ],
     "suggest": {
-        "magento-hackathon/magento-composer-installer": "*"
-    }
+        "magento-hackathon\/magento-composer-installer": "*"
+    },
+    "keywords": [
+        "openmage-module"
+    ]
 }
